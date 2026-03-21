@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -42,8 +43,8 @@ SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal des
     - provide 2 swaps suggesting greener full-meal alternatives (not per-item), with their own total co2_lbs, water_gallons, and severity rating.
     - If the input is not a food item, return: {"error": "Please enter a valid meal description."}"""
 
-@app.route("/analyze", methods=["POST"])
-def analyze():
+@app.route("/analyze-text", methods=["POST"])
+def analyze_text():
     data = request.get_json()
     if not data or not data.get("meal", "").strip():
         return jsonify({"error": "Please provide a meal description."}), 400
@@ -66,6 +67,36 @@ def analyze():
         return jsonify({"error": "Failed to parse AI response."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/analyze-image", methods=["POST"])
+def analyze_image():
+    if "image" not in request.files:
+        return jsonify({"error": "Please upload an image."}), 400
+
+    image = request.files["image"]
+    image_bytes = image.read()
+    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                {"text": "Analyze this meal:"},
+                {"inline_data": {"mime_type": image.content_type, "data": image_base64}},
+            ],
+            config={
+                "response_mime_type": "application/json",
+                "temperature": 0.3,
+                "system_instruction": SYSTEM_PROMPT,
+            },
+        )
+        result = json.loads(response.text)
+        return jsonify(result)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Failed to parse AI response."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
