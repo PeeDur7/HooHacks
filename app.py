@@ -1,6 +1,10 @@
 import os
 import json
 import base64
+import io
+from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -100,17 +104,20 @@ def analyze_image():
     if "image" not in request.files:
         return jsonify({"error": "Please upload an image."}), 400
 
-    # gets uploaded file from request, turn it into bytes, then back into string
+    # gets uploaded file, converts any image format to JPEG for Gemini compatibility
     image = request.files["image"]
-    image_bytes = image.read()
-    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    img = Image.open(image)
+    img = img.convert("RGB")
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG")
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
                 {"text": "Analyze this meal:"},
-                {"inline_data": {"mime_type": image.content_type, "data": image_base64}},
+                {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}},
             ],
             config={
                 "response_mime_type": "application/json",
@@ -121,7 +128,7 @@ def analyze_image():
         result = json.loads(response.text)
         return jsonify(result)
     except json.JSONDecodeError:
-        return jsonify({"error": "Failed to parse AI response."}), 500
+        return jsonify({"error": "Failed to parse AI response.", "raw": response.text}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
