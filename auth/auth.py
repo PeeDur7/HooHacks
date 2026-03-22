@@ -19,7 +19,7 @@ def registerUser():
         return jsonify({"error" : "All fields are required"}),400
     
     user = db["users"].find_one({"email" : email})
-    if not user:
+    if user:
         return jsonify({"error" : "User has already been registered"}),400
     
     elif confirmPassword != password: #if passwords dont match dont proceed to user registration
