@@ -129,7 +129,7 @@ export default function HomePage() {
           <div>
             <p className="text-xl font-bold leading-none" style={{ color: "#1e3a2a" }}>GreenPlate</p>
             <p className="mono text-[9px] tracking-widest uppercase mt-0.5" style={{ color: "#4a7c59" }}>
-              Carbon Food Analyzer
+              Carbon Food Emissions Analyzer
             </p>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <section className="relative z-10 flex flex-col items-center text-center px-4 pt-12 pb-20 fade-up">
         <p className="mono text-[10px] tracking-[0.4em] uppercase mb-6" style={{ color: "#3d6b4a" }}>
-          🌍 Carbon Food Analyzer
+          Carbon Food Emissions Analyzer
         </p>
         <h1 className="leading-none mb-6" style={{ fontSize: "clamp(52px, 10vw, 100px)", color: "#1e3a2a" }}>
           Eat Smart,<br />
@@ -158,7 +158,7 @@ export default function HomePage() {
         </h1>
         <p className="mono max-w-sm leading-relaxed mb-10" style={{ fontSize: "13px", color: "#3d6b4a" }}>
           Upload a photo of your meal. Get your carbon footprint,<br />
-          water usage, and a greener swap — instantly.
+          water usage, and a greener alternative.
         </p>
         <div className="flex gap-4 flex-wrap justify-center mb-20">
           <button onClick={() => navigate("/register")}
@@ -173,7 +173,6 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* ── Mock app card ── */}
        
       </section>
 
@@ -181,9 +180,9 @@ export default function HomePage() {
       <section className="relative z-10 py-16" style={{ background: "rgba(45,90,61,0.08)", borderTop: "1px solid rgba(45,90,61,0.15)", borderBottom: "1px solid rgba(45,90,61,0.15)" }}>
         <div className="max-w-4xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-10 text-center">
           {[
-            { value: "Free", label: "to analyze your first meal" },
+            { value: "Free", label: "to analyze" },
             { value: "80%", label: "emissions saved going plant-based" },
-            { value: "500kg", label: "avg annual food carbon per person" },
+            { value: "2500kg", label: "avg annual food carbon per person" },
           ].map((s, i) => (
             <div key={i}>
               <p className="text-5xl font-bold mb-2" style={{ color: "#2d5a3d" }}>{s.value}</p>
@@ -208,7 +207,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
             {[
               { n: "01", t: "Upload", d: "Drop a photo or type what you ate. Gemini identifies every ingredient automatically." },
-              { n: "02", t: "Analyze", d: "Get your CO₂ footprint, water usage, and Green Score — all calculated in seconds." },
+              { n: "02", t: "Analyze", d: "Get your CO₂ footprint, water usage, and our custom algorithmic Green Score all calculated in seconds." },
               { n: "03", t: "Swap", d: "Receive a personalised eco alternative that keeps the flavour and cuts the impact." },
             ].map((s, i) => (
               <div key={i} className="flex flex-col gap-3 pt-6" style={{ borderTop: "1px solid rgba(45,90,61,0.2)" }}>

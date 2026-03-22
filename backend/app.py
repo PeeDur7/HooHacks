@@ -1,6 +1,10 @@
 import os
 import json
 import base64
+import io
+from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -45,6 +49,7 @@ SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal des
         "swaps": [
             { "suggestion": "<full meal alternative>", "co2_kg": <number>, "water_liters": <number>, "severity": "<low|medium|high>", "comparisons": { "driving_miles": <number>, "showers": <number> } }
         ]
+        "green_score": <integer 0-100>
     }
 
     Guidelines:
@@ -55,7 +60,18 @@ SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal des
     - comparisons.driving_miles: total_co2_kg divided by 0.404 (avg kg CO2 per mile driven).
     - comparisons.showers: total_water_liters divided by 65 (liters per 8-min shower).
     - provide 2 swaps suggesting greener full-meal alternatives (not per-item), with their own total co2_kg, water_liters, and severity rating.
-    - If the input is not a food item, return: {"error": "Please enter a valid meal description."}"""
+    - If the input is not a food item, return: {"error": "Please enter a valid meal description."}
+    - green_score: integer 0-100 where 100 is most sustainable. Calculate as follows:
+  - Start with 100
+  - Subtract (total_co2_kg / 10) * 40 for carbon penalty (max 40 points deducted)
+  - Subtract (total_water_liters / 5000) * 30 for water penalty (max 30 points deducted)
+  - Subtract up to 30 points for animal products: beef/lamb = -15, pork = -10, chicken/turkey = -6, fish = -5, dairy = -4, eggs = -3
+  - Clamp final value between 0 and 100
+
+    
+    
+    
+    """
 
 # Runs the analyze-text function when POST request is sent to analyze-text
 @app.route("/analyze-text", methods=["POST"])
@@ -100,17 +116,20 @@ def analyze_image():
     if "image" not in request.files:
         return jsonify({"error": "Please upload an image."}), 400
 
-    # gets uploaded file from request, turn it into bytes, then back into string
+    # gets uploaded file, converts any image format to JPEG for Gemini compatibility
     image = request.files["image"]
-    image_bytes = image.read()
-    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    img = Image.open(image)
+    img = img.convert("RGB")
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG")
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
                 {"text": "Analyze this meal:"},
-                {"inline_data": {"mime_type": image.content_type, "data": image_base64}},
+                {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}},
             ],
             config={
                 "response_mime_type": "application/json",
@@ -121,10 +140,10 @@ def analyze_image():
         result = json.loads(response.text)
         return jsonify(result)
     except json.JSONDecodeError:
-        return jsonify({"error": "Failed to parse AI response."}), 500
+        return jsonify({"error": "Failed to parse AI response.", "raw": response.text}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port = 5001)

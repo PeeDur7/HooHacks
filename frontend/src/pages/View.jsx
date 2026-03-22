@@ -17,43 +17,43 @@ function scoreColor(score) {
   return "#c0392b";
 }
 
-// ── Semicircle Dial ───────────────────────────────────────────────────────────
 function SemiDial({ score }) {
   const color = scoreColor(score);
-  const r = 70;
+  const r = 60;
   const cx = 100;
   const cy = 90;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const toXY = (deg) => ({
-    x: cx + r * Math.cos(toRad(deg)),
-    y: cy + r * Math.sin(toRad(deg)),
-  });
-
-  // Arc goes from 180° (left) to 0° (right)
-  const start = toXY(180);
-  const end = toXY(0);
-  // Fill goes from 180° toward 0° based on score
-  const fillDeg = 180 - (score / 100) * 180;
-  const fill = toXY(fillDeg);
-  const largeArc = score >= 50 ? 1 : 0;
-
-  const trackPath = `M ${start.x} ${start.y} A ${r} ${r} 0 0 1 ${end.x} ${end.y}`;
-  const fillPath = `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${fill.x} ${fill.y}`;
+  const circumference = Math.PI * r; // half circle
+  const fillLength = (score / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center">
-      <svg width="200" height="105" viewBox="0 0 200 105">
-        <path d={trackPath} fill="none" stroke="rgba(45,90,61,0.1)" strokeWidth="14" strokeLinecap="round" />
-        <path d={fillPath} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
-          style={{ transition: "all 1.2s ease" }} />
-        <text x={cx} y={cy - 8} textAnchor="middle" fontSize="32" fontWeight="700"
+    <div className="flex flex-col items-center w-full">
+      <svg width="100%" viewBox="0 0 200 105" style={{ maxWidth: "240px" }}>
+        {/* Track */}
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none"
+          stroke="rgba(45,90,61,0.1)"
+          strokeWidth="14"
+          strokeLinecap="round"
+        />
+        {/* Fill using strokeDasharray */}
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none"
+          stroke={color}
+          strokeWidth="14"
+          strokeLinecap="round"
+          strokeDasharray={`${fillLength} ${circumference}`}
+          style={{ transition: "stroke-dasharray 1.2s ease" }}
+        />
+        <text x={cx} y={cy - 10} textAnchor="middle" fontSize="34" fontWeight="700"
           fill={color} style={{ fontFamily: "'DM Serif Display', serif" }}>{score}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#4a7c59"
-          style={{ fontFamily: "'DM Mono', monospace" }}>/ 100</text>
-        <text x="10" y="102" fontSize="9" fill="#9ab8a4" style={{ fontFamily: "'DM Mono', monospace" }}>0</text>
-        <text x="178" y="102" fontSize="9" fill="#9ab8a4" style={{ fontFamily: "'DM Mono', monospace" }}>100</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="10" fill="#9ab8a4"
+          style={{ fontFamily: "'DM Mono', monospace" }}>out of 100</text>
+        <text x="14" y="104" fontSize="9" fill="#9ab8a4" style={{ fontFamily: "'DM Mono', monospace" }}>0</text>
+        <text x="176" y="104" fontSize="9" fill="#9ab8a4" style={{ fontFamily: "'DM Mono', monospace" }}>100</text>
       </svg>
-      <p className="text-sm font-bold -mt-1" style={{ ...MONO, color }}>
+      <p className="text-sm font-bold" style={{ ...MONO, color }}>
         {score >= 70 ? "Low Impact" : score >= 45 ? "Moderate Impact" : "High Impact"}
       </p>
     </div>
@@ -229,8 +229,10 @@ export default function View() {
     : results;
 
   const displayScore = displayData
-    ? severityToScore(displayData.severity || displayData.severity)
-    : 0;
+  ? (selectedFood !== null
+      ? (results.swaps[selectedFood].green_score ?? severityToScore(results.swaps[selectedFood].severity))
+      : (results.green_score ?? severityToScore(results.severity)))
+  : 0;
 
   return (
     <div className="min-h-screen flex flex-col"
@@ -484,10 +486,13 @@ export default function View() {
                   🌿 Added to your food log!
                 </div>
               )}
+              
             </div>
           )}
+          
         </div>
       </div>
+
     </div>
   );
 }
