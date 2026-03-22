@@ -23,8 +23,10 @@ from model.user import userBluePrint
 app.register_blueprint(authBlueprint, url_prefix="/auth")
 app.register_blueprint(userBluePrint, url_prefix="/user")
 
+# Creates the Gemini API client
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# Creates SYSTEM_PROMPT variable that gives the instructions to Gemini on how to inteperet the string, including the JSON schema to return
 SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal description, analyze each food item's carbon footprint and water usage, and provide a summary of the meal's overall environmental impact.
 
     Return valid JSON matching this exact schema:
@@ -55,15 +57,21 @@ SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal des
     - provide 2 swaps suggesting greener full-meal alternatives (not per-item), with their own total co2_kg, water_liters, and severity rating.
     - If the input is not a food item, return: {"error": "Please enter a valid meal description."}"""
 
+# Runs the analyze-text function when POST request is sent to analyze-text
 @app.route("/analyze-text", methods=["POST"])
 def analyze_text():
+    # reads JSON sent from frontend to convert into dictionary
     data = request.get_json()
+    # checks if JSON body is empty and if the "meal" key is there
     if not data or not data.get("meal", "").strip():
         return jsonify({"error": "Please provide a meal description."}), 400
 
+    # cleans up the string to send to Gemini
     meal = data["meal"].strip()
 
+    # Handles errors if anything goes wrong
     try:
+        # AI call to Gemini with the given meal
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=f"Analyze this meal: {meal}",
@@ -73,18 +81,26 @@ def analyze_text():
                 "system_instruction": SYSTEM_PROMPT,
             },
         )
+
+        # converts text into dictionary
         result = json.loads(response.text)
+
+        # return data as JSON
         return jsonify(result)
     except json.JSONDecodeError:
         return jsonify({"error": "Failed to parse AI response."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# runs analyze-image function when POST request is sent to analyze-image
 @app.route("/analyze-image", methods=["POST"])
 def analyze_image():
+
+    #checks if request includes file with the key "image"
     if "image" not in request.files:
         return jsonify({"error": "Please upload an image."}), 400
 
+    # gets uploaded file from request, turn it into bytes, then back into string
     image = request.files["image"]
     image_bytes = image.read()
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
