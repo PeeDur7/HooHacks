@@ -10,10 +10,18 @@ def addFoodToDatabase(): #recieves a jwt token and the food data as json
     db = current_app.config["db"]
     data = request.get_json()
     
-    token = request.headers.get("Authorization").split(" ")[1]
-    food = data.get("food")
+    authHeader = request.headers.get("Authorization")
+    if not authHeader:
+        return jsonify({"error" : "Missing token"}), 401
+    token = authHeader.split(" ")[1]    
 
-    decodedToken = jwt.decode(token, current_app.config["SECRET_KEY"],algorithms=["HS256"])
+    try:
+        decodedToken = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+    
     userId = decodedToken["userId"] #get user id from the token
 
     user = db["users"].find_one({"_id" : ObjectId(userId)})
@@ -21,6 +29,7 @@ def addFoodToDatabase(): #recieves a jwt token and the food data as json
         return jsonify({"error" : "User is not authenticated"}),401
     
     currentDate = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    food = data.get("food")
 
     #each time a new food is added, the date formated in xxxx-xx-xx is the key, then the actual food dictionary
     #this makes searching for the last 7 days worth of food is easy
@@ -39,9 +48,19 @@ def addFoodToDatabase(): #recieves a jwt token and the food data as json
 @userBluePrint.route("/avgEmissionPerWeek", methods=["GET"])
 def avgEmissionPerWeek(): #this method should only recieve a jwt token as the parameter from the frontend
     db = current_app.config["db"]
-    token = request.headers.get("Authorization").split(" ")[1]
+    authHeader = request.headers.get("Authorization")
 
-    decodedToken = jwt.decode(token, current_app.config["SECRET_KEY"],algorithms=["HS256"])
+    if not authHeader:
+        return jsonify({"error" : "Missing token"}), 401
+    token = authHeader.split(" ")[1]
+
+    try:
+        decodedToken = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+    
     userId = decodedToken["userId"] #get user id from the token
 
     user = db["users"].find_one({"_id" : ObjectId(userId)})
@@ -56,6 +75,7 @@ def avgEmissionPerWeek(): #this method should only recieve a jwt token as the pa
     for food in foods:
         date = list(food.keys())[0]
         if date >= pastWeekDate and date <= currentDate:
-            total += food[date]["emission"]
+            total += food[date]["total_co2_kg"]
     
-    return jsonify({"avgEmission": total / 7}), 200 #returns the weekly average CO2
+    avg = total / 7 if total > 0 else 0
+    return jsonify({"total_co2_kg": avg}), 200 #returns the weekly average CO2
