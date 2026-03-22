@@ -1,8 +1,11 @@
-from flask import Flask
+import os
+import json
+import base64
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from google import genai
 from pymongo import MongoClient
-import os
 
 load_dotenv()
 
@@ -19,3 +22,93 @@ from model.user import userBluePrint
 
 app.register_blueprint(authBlueprint, url_prefix="/auth")
 app.register_blueprint(userBluePrint, url_prefix="/user")
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+SYSTEM_PROMPT = """You are a food environmental impact analyst. Given a meal description, analyze each food item's carbon footprint and water usage, and provide a summary of the meal's overall environmental impact.
+
+    Return valid JSON matching this exact schema:
+    {
+        "meal": "<the original meal description>",
+        "items": [
+        { "name": "<food item>", "co2_lbs": <number>, "water_gallons": <number>}
+        ],
+        "total_co2_lbs": <number>,
+        "total_water_gallons": <number>,
+        "severity": "<low|medium|high>",
+        "comparisons": {
+            "driving_miles": <number>,
+            "showers": <number>
+        },
+        "swaps": [
+            { "suggestion": "<full meal alternative>", "co2_lbs": <number>, "water_gallons": <number>, "severity": "<low|medium|high>", "comparisons": { "driving_miles": <number>, "showers": <number> } }
+        ]
+    }
+
+    Guidelines:
+    - Base estimates on published lifecycle assessment data for food products.
+    - co2_lbs is the total CO2-equivalent emissions in pounds for a typical single serving.
+    - water_gallons is the total water footprint in gallons for a typical single serving.
+    -  severity: "low" if total_co2_lbs < 2.5, "medium" if 2.5-10, "high" if > 10.
+    - comparisons.driving_miles: total_co2_lbs divided by 0.89 (avg lbs CO2 per mile driven).
+    - comparisons.showers: total_water_gallons divided by 17 (gallons per 8-min shower).
+    - provide 2 swaps suggesting greener full-meal alternatives (not per-item), with their own total co2_lbs, water_gallons, and severity rating.
+    - If the input is not a food item, return: {"error": "Please enter a valid meal description."}"""
+
+@app.route("/analyze-text", methods=["POST"])
+def analyze_text():
+    data = request.get_json()
+    if not data or not data.get("meal", "").strip():
+        return jsonify({"error": "Please provide a meal description."}), 400
+
+    meal = data["meal"].strip()
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"Analyze this meal: {meal}",
+            config={
+                "response_mime_type": "application/json",
+                "temperature": 0.3,
+                "system_instruction": SYSTEM_PROMPT,
+            },
+        )
+        result = json.loads(response.text)
+        return jsonify(result)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Failed to parse AI response."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/analyze-image", methods=["POST"])
+def analyze_image():
+    if "image" not in request.files:
+        return jsonify({"error": "Please upload an image."}), 400
+
+    image = request.files["image"]
+    image_bytes = image.read()
+    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                {"text": "Analyze this meal:"},
+                {"inline_data": {"mime_type": image.content_type, "data": image_base64}},
+            ],
+            config={
+                "response_mime_type": "application/json",
+                "temperature": 0.3,
+                "system_instruction": SYSTEM_PROMPT,
+            },
+        )
+        result = json.loads(response.text)
+        return jsonify(result)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Failed to parse AI response."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
